@@ -1,7 +1,7 @@
 // Human Avatar Animation Engine for Canvas Video Production
 // $0 Cost - 100% Client-Side Procedural 2D Rendering
 
-export type AvatarId = 'farzana' | 'rafi' | 'sheikh-farid';
+export type AvatarId = 'farzana' | 'rafi' | 'sheikh-farid' | 'custom-photo';
 export type AvatarPose = 'pip-circle' | 'side-anchor' | 'studio-desk';
 export type AvatarExpression = 'friendly' | 'confident' | 'serious' | 'enthusiastic';
 export type AvatarGesture = 'welcome' | 'point' | 'thumbs-up' | 'news-desk';
@@ -14,6 +14,8 @@ export interface AvatarOptions {
   isSpeaking: boolean;
   speechText?: string;
   theme: 'emerald' | 'amber' | 'cyan' | 'purple';
+  customPhotoImg?: HTMLImageElement | null;
+  customPresenterName?: string;
 }
 
 export interface AvatarPresenterProfile {
@@ -69,6 +71,19 @@ export const AVATAR_PROFILES: Record<AvatarId, AvatarPresenterProfile> = {
     hairColor: '#334155',
     clothingColor: '#312e81', // Royal Navy Suit
     accentColor: '#c084fc',
+  },
+  'custom-photo': {
+    id: 'custom-photo',
+    name: 'Custom Presenter',
+    nameBn: 'কাস্টম উপস্থাপক',
+    role: 'Special Guest Presenter',
+    roleBn: 'আপলোড করা বিশেষ উপস্থাপক',
+    tagline: 'যেকোনো মানুষের ছবির বাস্তবসম্মত জীবন্ত ভিডিও উপস্থাপনা',
+    gender: 'female',
+    skinTone: '#fed7aa',
+    hairColor: '#0f172a',
+    clothingColor: '#0284c7',
+    accentColor: '#ec4899',
   },
 };
 
@@ -163,28 +178,49 @@ export function drawHumanAvatar(
     );
 
     // Render human bust inside circle
-    const avatarScale = bubbleRadius / 65;
-    ctx.translate(bubbleCenterX, bubbleCenterY + bubbleRadius * 0.35 + breathY);
-    renderHumanFigure(ctx, avatarScale, profile, {
-      breathY,
-      headNodAngle,
-      headSwayX,
-      isBlinking,
-      pupilOffsetX,
-      pupilOffsetY,
-      mouthOpen,
-      mouthRoundness,
-      browOffset,
-      isSpeaking,
-      gesture,
-      elapsed,
-    });
+    if (avatarId === 'custom-photo' && options.customPhotoImg) {
+      ctx.save();
+      const img = options.customPhotoImg;
+      const d = bubbleRadius * 2;
+      const sSize = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth - sSize) / 2;
+      const sy = (img.naturalHeight - sSize) / 2;
+      ctx.drawImage(
+        img,
+        sx,
+        sy,
+        sSize,
+        sSize,
+        bubbleCenterX - bubbleRadius,
+        bubbleCenterY - bubbleRadius + breathY,
+        d,
+        d
+      );
+      ctx.restore();
+    } else {
+      const avatarScale = bubbleRadius / 65;
+      ctx.translate(bubbleCenterX, bubbleCenterY + bubbleRadius * 0.35 + breathY);
+      renderHumanFigure(ctx, avatarScale, profile, {
+        breathY,
+        headNodAngle,
+        headSwayX,
+        isBlinking,
+        pupilOffsetX,
+        pupilOffsetY,
+        mouthOpen,
+        mouthRoundness,
+        browOffset,
+        isSpeaking,
+        gesture,
+        elapsed,
+      });
+    }
     ctx.restore();
 
     // Presenter name badge under PIP
     ctx.save();
     ctx.font = 'bold 11px "Hind Siliguri", sans-serif';
-    const tagText = `🎙️ ${profile.nameBn}`;
+    const tagText = `🎙️ ${options.customPresenterName || profile.nameBn}`;
     const tagMetrics = ctx.measureText(tagText);
     const tagW = tagMetrics.width + 16;
     const tagX = bubbleCenterX - tagW / 2;
@@ -221,21 +257,58 @@ export function drawHumanAvatar(
     const anchorX = isPortrait ? canvasWidth * 0.82 : canvasWidth * 0.80;
     const anchorY = canvasHeight * 0.88 + breathY;
 
-    ctx.translate(anchorX, anchorY);
-    renderHumanFigure(ctx, anchorScale, profile, {
-      breathY,
-      headNodAngle,
-      headSwayX,
-      isBlinking,
-      pupilOffsetX,
-      pupilOffsetY,
-      mouthOpen,
-      mouthRoundness,
-      browOffset,
-      isSpeaking,
-      gesture,
-      elapsed,
-    });
+    if (avatarId === 'custom-photo' && options.customPhotoImg) {
+      ctx.save();
+      ctx.translate(anchorX, anchorY - 60);
+      const cardW = 130 * anchorScale;
+      const cardH = 170 * anchorScale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, 14);
+      ctx.clip();
+      const img = options.customPhotoImg;
+      const imgRatio = img.naturalWidth / img.naturalHeight;
+      const targetRatio = cardW / cardH;
+      let sW = img.naturalWidth;
+      let sH = img.naturalHeight;
+      let sx = 0;
+      let sy = 0;
+      if (imgRatio > targetRatio) {
+        sW = img.naturalHeight * targetRatio;
+        sx = (img.naturalWidth - sW) / 2;
+      } else {
+        sH = img.naturalWidth / targetRatio;
+        sy = (img.naturalHeight - sH) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sW, sH, -cardW / 2, -cardH / 2, cardW, cardH);
+      ctx.restore();
+
+      // Border and speaker ring
+      ctx.strokeStyle = profile.accentColor;
+      ctx.lineWidth = isSpeaking ? 2.5 : 1.5;
+      ctx.shadowColor = profile.accentColor;
+      ctx.shadowBlur = isSpeaking ? 16 : 6;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, 14);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.translate(anchorX, anchorY);
+      renderHumanFigure(ctx, anchorScale, profile, {
+        breathY,
+        headNodAngle,
+        headSwayX,
+        isBlinking,
+        pupilOffsetX,
+        pupilOffsetY,
+        mouthOpen,
+        mouthRoundness,
+        browOffset,
+        isSpeaking,
+        gesture,
+        elapsed,
+      });
+    }
 
     // Anchor Lower Third Nameplate
     ctx.restore();
@@ -255,7 +328,7 @@ export function drawHumanAvatar(
     ctx.font = 'bold 12px "Hind Siliguri", sans-serif';
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
-    ctx.fillText(profile.nameBn, anchorX, plateY + 17);
+    ctx.fillText(options.customPresenterName || profile.nameBn, anchorX, plateY + 17);
     ctx.restore();
 
     // Floating speech bubble
@@ -279,20 +352,53 @@ export function drawHumanAvatar(
     // Draw Human figure behind the desk
     ctx.save();
     ctx.translate(deskCenterX, deskCenterY);
-    renderHumanFigure(ctx, deskScale, profile, {
-      breathY,
-      headNodAngle,
-      headSwayX,
-      isBlinking,
-      pupilOffsetX,
-      pupilOffsetY,
-      mouthOpen,
-      mouthRoundness,
-      browOffset,
-      isSpeaking,
-      gesture,
-      elapsed,
-    });
+    if (avatarId === 'custom-photo' && options.customPhotoImg) {
+      const cardW = 150 * deskScale;
+      const cardH = 185 * deskScale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2 - 20, cardW, cardH, [16, 16, 4, 4]);
+      ctx.clip();
+      const img = options.customPhotoImg;
+      const imgRatio = img.naturalWidth / img.naturalHeight;
+      const targetRatio = cardW / cardH;
+      let sW = img.naturalWidth;
+      let sH = img.naturalHeight;
+      let sx = 0;
+      let sy = 0;
+      if (imgRatio > targetRatio) {
+        sW = img.naturalHeight * targetRatio;
+        sx = (img.naturalWidth - sW) / 2;
+      } else {
+        sH = img.naturalWidth / targetRatio;
+        sy = (img.naturalHeight - sH) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sW, sH, -cardW / 2, -cardH / 2 - 20, cardW, cardH);
+      ctx.restore();
+
+      ctx.strokeStyle = profile.accentColor;
+      ctx.lineWidth = isSpeaking ? 2.5 : 1.5;
+      ctx.shadowColor = profile.accentColor;
+      ctx.shadowBlur = isSpeaking ? 16 : 6;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2 - 20, cardW, cardH, [16, 16, 4, 4]);
+      ctx.stroke();
+    } else {
+      renderHumanFigure(ctx, deskScale, profile, {
+        breathY,
+        headNodAngle,
+        headSwayX,
+        isBlinking,
+        pupilOffsetX,
+        pupilOffsetY,
+        mouthOpen,
+        mouthRoundness,
+        browOffset,
+        isSpeaking,
+        gesture,
+        elapsed,
+      });
+    }
     ctx.restore();
 
     // Modern Curved Glass Studio Desk with LED Accent

@@ -1,6 +1,7 @@
 export type ActiveTab =
   | 'video-analyzer'
   | 'zero-cost-video-creator'
+  | '30s-audio-engine'
   | 'ai-lab'
   | 'citizendesk'
   | 'gmail'

@@ -43,6 +43,7 @@ import {
   Camera,
   Sun,
   RefreshCw,
+  X,
   SlidersHorizontal,
   Check,
   Pause,
@@ -65,6 +66,20 @@ import {
   AvatarGesture,
   AVATAR_PROFILES,
 } from './HumanAvatarEngine';
+import {
+  CanvasColorFilterConfig,
+  DEFAULT_COLOR_FILTER_CONFIG,
+  buildCanvasFilterCss,
+  isFilterActive,
+  COLOR_FILTER_PRESETS,
+} from './CanvasColorFilters';
+import { ColorFilterControls } from './ColorFilterControls';
+import {
+  YouTubeMusicHub,
+  BackgroundMusicConfig,
+  DEFAULT_MUSIC_CONFIG,
+} from './YouTubeMusicHub';
+import { ProceduralMusicPlayer } from './YouTubeMusicEngine';
 
 export type TextAnimStyle = 'kinetic-bounce' | 'typewriter' | 'slide-fade' | 'neon-glow' | 'wave-motion';
 export type TransitionEffect = 'wipe-left' | 'fade-dissolve' | 'iris-circle' | 'zoom-burst';
@@ -320,7 +335,20 @@ const PRESET_SCRIPTS: PresetScript[] = [
   },
 ];
 
-export const ZeroCostVideoStudio: React.FC = () => {
+export interface ZeroCostVideoStudioProps {
+  initialAudioTrack?: {
+    title: string;
+    blob?: Blob;
+    url?: string;
+    presetKey: string;
+  } | null;
+  onOpenAudioStudio?: () => void;
+}
+
+export const ZeroCostVideoStudio: React.FC<ZeroCostVideoStudioProps> = ({
+  initialAudioTrack,
+  onOpenAudioStudio,
+}) => {
   const [selectedPreset, setSelectedPreset] = useState<PresetScript>(PRESET_SCRIPTS[0]);
   const [videoTitle, setVideoTitle] = useState<string>(PRESET_SCRIPTS[0].title);
   const [videoSubtitle, setVideoSubtitle] = useState<string>(PRESET_SCRIPTS[0].subtitle);
@@ -343,6 +371,9 @@ export const ZeroCostVideoStudio: React.FC = () => {
   const [uploadedAudioFile, setUploadedAudioFile] = useState<File | null>(null);
   const [uploadedAudioUrl, setUploadedAudioUrl] = useState<string | null>(null);
   const [uploadedAudioBuffer, setUploadedAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [micErrorMessage, setMicErrorMessage] = useState<string | null>(null);
+  const [micFallbackNotice, setMicFallbackNotice] = useState<string | null>(null);
+  const [recorderErrorMsg, setRecorderErrorMsg] = useState<string | null>(null);
 
   // ==========================================
   // REALISTIC IMAGE & AI GENERATOR STATE
@@ -380,6 +411,40 @@ export const ZeroCostVideoStudio: React.FC = () => {
   const [avatarExpression, setAvatarExpression] = useState<AvatarExpression>('friendly');
   const [avatarGesture, setAvatarGesture] = useState<AvatarGesture>('welcome');
   const [isAvatarTesting, setIsAvatarTesting] = useState<boolean>(false);
+  const [customPresenterPhotoUrl, setCustomPresenterPhotoUrl] = useState<string | null>(null);
+  const [customPresenterName, setCustomPresenterName] = useState<string>('বিশেষ উপস্থাপক');
+
+  // Real-Time Canvas Color Filter State (Grayscale, Sepia, Invert, etc.)
+  const [colorFilterConfig, setColorFilterConfig] = useState<CanvasColorFilterConfig>(DEFAULT_COLOR_FILTER_CONFIG);
+
+  // YouTube Background Music & Multi-Track Mixing State
+  const [musicConfig, setMusicConfig] = useState<BackgroundMusicConfig>(DEFAULT_MUSIC_CONFIG);
+
+  // Synchronize when 30-Second Audio Engine sends a song to the studio
+  useEffect(() => {
+    if (initialAudioTrack) {
+      setMusicConfig((prev) => ({
+        ...prev,
+        enabled: true,
+        customAudioUrl: initialAudioTrack.url || null,
+        customAudioName: initialAudioTrack.title,
+        selectedTrack: {
+          id: `30s-audio-${Date.now()}`,
+          title: initialAudioTrack.title,
+          titleBn: initialAudioTrack.title,
+          artist: '৩০সে. অডিও ইঞ্জিন',
+          category: 'acoustic',
+          categoryBn: 'প্রসিডিউরাল গান',
+          duration: 30,
+          bpm: 100,
+          mood: 'প্রসিডিউরাল গান',
+          audioUrl: initialAudioTrack.url,
+          proceduralPreset: (initialAudioTrack.presetKey as any) || 'news-broadcast',
+          descriptionBn: '৩০ সেকেন্ডের অডিও মিউজিক ইঞ্জিন থেকে সরাসরি সংগৃহীত',
+        },
+      }));
+    }
+  }, [initialAudioTrack]);
 
   // Recording & Playback State (CanvasRecorder Engine)
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -401,6 +466,18 @@ export const ZeroCostVideoStudio: React.FC = () => {
   const voiceRecordIntervalRef = useRef<any>(null);
   const voiceAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const liveMicStreamRef = useRef<MediaStream | null>(null);
+  const proceduralMusicPlayerRef = useRef<ProceduralMusicPlayer | null>(null);
+  const backgroundAudioSourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+
+  // Synchronous refs for 60fps canvas rendering loop
+  const colorFilterConfigRef = useRef<CanvasColorFilterConfig>(colorFilterConfig);
+  colorFilterConfigRef.current = colorFilterConfig;
+  const musicConfigRef = useRef<BackgroundMusicConfig>(musicConfig);
+  musicConfigRef.current = musicConfig;
+  const customPresenterPhotoUrlRef = useRef<string | null>(customPresenterPhotoUrl);
+  customPresenterPhotoUrlRef.current = customPresenterPhotoUrl;
+  const customPresenterNameRef = useRef<string>(customPresenterName);
+  customPresenterNameRef.current = customPresenterName;
 
   // In-memory HTMLImageElement Cache to prevent canvas flickering
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -602,6 +679,94 @@ export const ZeroCostVideoStudio: React.FC = () => {
     img.src = url;
   };
 
+  // Upload Custom Presenter Photo (যেকোনো মানুষের ছবি দিয়ে উপস্থাপক তৈরি)
+  const handlePresenterPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      imageCacheRef.current.set(url, img);
+      setCustomPresenterPhotoUrl(url);
+      setSelectedAvatar('custom-photo');
+      setEnableAvatar(true);
+    };
+    img.src = url;
+  };
+
+  // 1-Click Instant Style for any uploaded photo or video production
+  const applyPhotoStyle = (styleId: 'news' | 'cyberpunk' | 'noir' | 'sepia' | 'viral') => {
+    if (styleId === 'news') {
+      setActiveTheme('emerald');
+      setColorGradeMood('cinematic-studio');
+      setAvatarPose('studio-desk');
+      setTextAnimStyle('kinetic-bounce');
+      setColorFilterConfig({
+        ...DEFAULT_COLOR_FILTER_CONFIG,
+        contrast: 115,
+        brightness: 102,
+        saturate: 110,
+        target: 'master',
+      });
+      setActiveBackdropUrl(PRESET_REALISTIC_BACKDROPS[0].url);
+    } else if (styleId === 'cyberpunk') {
+      setActiveTheme('cyan');
+      setColorGradeMood('cyber-teal');
+      setAvatarPose('side-anchor');
+      setTextAnimStyle('neon-glow');
+      setColorFilterConfig({
+        ...DEFAULT_COLOR_FILTER_CONFIG,
+        hueRotate: 285,
+        saturate: 175,
+        contrast: 130,
+        brightness: 105,
+        target: 'master',
+      });
+      setActiveBackdropUrl(PRESET_REALISTIC_BACKDROPS[2].url);
+    } else if (styleId === 'noir') {
+      setActiveTheme('purple');
+      setColorGradeMood('cinematic-studio');
+      setAvatarPose('side-anchor');
+      setTextAnimStyle('typewriter');
+      setColorFilterConfig({
+        ...DEFAULT_COLOR_FILTER_CONFIG,
+        grayscale: 100,
+        contrast: 155,
+        brightness: 92,
+        target: 'master',
+      });
+      setActiveBackdropUrl(PRESET_REALISTIC_BACKDROPS[5].url);
+    } else if (styleId === 'sepia') {
+      setActiveTheme('amber');
+      setColorGradeMood('golden-hour');
+      setAvatarPose('pip-circle');
+      setTextAnimStyle('slide-fade');
+      setColorFilterConfig({
+        ...DEFAULT_COLOR_FILTER_CONFIG,
+        sepia: 95,
+        contrast: 115,
+        saturate: 110,
+        target: 'master',
+      });
+      setActiveBackdropUrl(PRESET_REALISTIC_BACKDROPS[3].url);
+    } else if (styleId === 'viral') {
+      setActiveTheme('emerald');
+      setAspectRatio('9:16');
+      setColorGradeMood('warm-broadcast');
+      setAvatarPose('side-anchor');
+      setTextAnimStyle('kinetic-bounce');
+      setColorFilterConfig({
+        ...DEFAULT_COLOR_FILTER_CONFIG,
+        saturate: 165,
+        contrast: 120,
+        brightness: 105,
+        target: 'master',
+      });
+    }
+  };
+
   // Human Vocal Formant Synthesizer
   const playProceduralBengaliVoice = (
     ctx: AudioContext,
@@ -687,18 +852,27 @@ export const ZeroCostVideoStudio: React.FC = () => {
 
   // In-Studio Voice Clip Recorder
   const startRecordingVoiceClip = async () => {
+    setMicErrorMessage(null);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('আপনার ব্রাউজার মাইক্রোফোন সাপোর্ট করে না।');
+        setMicErrorMessage('আপনার ব্রাউজার বা ডিভাইসে সরাসরি মাইক্রোফোন অডিও রেকর্ডিং সাপোর্ট করে না। বিকল্প হিসেবে এআই সিন্থ ভয়েস, অডিও ফাইল বা ৩০সে. মিউজিক ইঞ্জিন ব্যবহার করুন।');
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+      } catch (err: any) {
+        console.warn('Microphone permission not granted:', err?.message || err);
+        setMicErrorMessage('মাইক্রোফোন অনুমতি দেওয়া হয়নি (Permission Denied) বা ডিভাইসে মাইক্রোফোন পাওয়া যায়নি। আপনি ব্রাউজারে অনুমতি দিতে পারেন অথবা নিচের যেকোনো বিকল্প দিয়ে ভিডিও তৈরি করতে পারেন:');
+        return;
+      }
 
       const options = { mimeType: 'audio/webm;codecs=opus' };
       let recorder: MediaRecorder;
@@ -730,9 +904,9 @@ export const ZeroCostVideoStudio: React.FC = () => {
       voiceRecordIntervalRef.current = setInterval(() => {
         setVoiceRecordSeconds((prev) => prev + 1);
       }, 1000);
-    } catch (err) {
-      console.error('Microphone error:', err);
-      alert('মাইক্রোফোন অনুমতি দেওয়া হয়নি বা পাওয়া যায়নি।');
+    } catch (err: any) {
+      console.warn('Microphone recording error:', err?.message || err);
+      setMicErrorMessage('মাইক্রোফোন চালু করতে সমস্যা হয়েছে। বিকল্প হিসেবে এআই সিন্থেসাইজড কণ্ঠ বা অডিও ফাইল ব্যবহার করুন।');
     }
   };
 
@@ -854,8 +1028,23 @@ export const ZeroCostVideoStudio: React.FC = () => {
       // Update active scene index for UI synchronization
       setActiveSceneIndex(sceneIdx);
 
+      // Real-time Color Filter resolution
+      const filterConfig = colorFilterConfigRef.current;
+      const activeFilterCss = buildCanvasFilterCss(filterConfig);
+      const isFiltered = isFilterActive(filterConfig);
+
       // 2. BACKDROP RENDERING: PHOTOREALISTIC IMAGE OR STUDIO GRADIENT
+      ctx.save();
+      ctx.filter = 'none';
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      // Master output filter (affects entire composite)
+      if (isFiltered && filterConfig.target === 'master') {
+        ctx.filter = activeFilterCss;
+      } else {
+        ctx.filter = 'none';
+      }
 
       const targetImageUrl = currentScene.imageUrl || activeBackdropUrl;
       const loadedImg = getOrLoadImage(targetImageUrl);
@@ -886,6 +1075,11 @@ export const ZeroCostVideoStudio: React.FC = () => {
         const drawY = (canvas.height - drawH) / 2 + panY;
 
         ctx.save();
+        if (isFiltered && (filterConfig.target === 'master' || filterConfig.target === 'media')) {
+          ctx.filter = activeFilterCss;
+        } else {
+          ctx.filter = 'none';
+        }
         ctx.drawImage(loadedImg, drawX, drawY, drawW, drawH);
 
         // Color Grading Tint Layer
@@ -1299,6 +1493,14 @@ export const ZeroCostVideoStudio: React.FC = () => {
         ctx.fill();
         ctx.restore();
 
+        const presenterPhotoImg = customPresenterPhotoUrlRef.current
+          ? getOrLoadImage(customPresenterPhotoUrlRef.current)
+          : null;
+
+        if (isFiltered && (filterConfig.target === 'master' || filterConfig.target === 'media')) {
+          ctx.filter = activeFilterCss;
+        }
+
         drawHumanAvatar(ctx, canvas.width, canvas.height, elapsed, {
           avatarId: selectedAvatar,
           pose: avatarPose,
@@ -1307,6 +1509,8 @@ export const ZeroCostVideoStudio: React.FC = () => {
           isSpeaking: isSpeakingNow,
           speechText: isSpeakingNow ? currentNarration : undefined,
           theme: activeTheme,
+          customPhotoImg: presenterPhotoImg,
+          customPresenterName: customPresenterNameRef.current,
         });
       }
 
@@ -1342,6 +1546,7 @@ export const ZeroCostVideoStudio: React.FC = () => {
         ctx.restore();
       }
 
+      ctx.filter = 'none';
       animationFrameRef.current = requestAnimationFrame(renderFrame);
     };
 
@@ -1379,6 +1584,9 @@ export const ZeroCostVideoStudio: React.FC = () => {
     enableCinematicAtmosphere,
     enableLiveOverlay,
     colorGradeMood,
+    colorFilterConfig,
+    customPresenterPhotoUrl,
+    customPresenterName,
     getOrLoadImage,
   ]);
 
@@ -1405,6 +1613,19 @@ export const ZeroCostVideoStudio: React.FC = () => {
     setIsRecordingPaused(false);
     setRecordProgress(100);
 
+    if (proceduralMusicPlayerRef.current) {
+      proceduralMusicPlayerRef.current.stop();
+      proceduralMusicPlayerRef.current = null;
+    }
+
+    if (backgroundAudioSourceNodeRef.current) {
+      try {
+        backgroundAudioSourceNodeRef.current.stop();
+        backgroundAudioSourceNodeRef.current.disconnect();
+      } catch (e) {}
+      backgroundAudioSourceNodeRef.current = null;
+    }
+
     if (liveMicStreamRef.current) {
       liveMicStreamRef.current.getTracks().forEach((t) => t.stop());
       liveMicStreamRef.current = null;
@@ -1424,9 +1645,12 @@ export const ZeroCostVideoStudio: React.FC = () => {
     if (!canvas) return;
 
     if (!CanvasRecorder.isSupported()) {
-      alert('আপনার ব্রাউজার MediaRecorder API সাপোর্ট করে না। অনুগ্রহ করে Chrome বা Edge ব্যবহার করুন।');
+      setRecorderErrorMsg('আপনার ব্রাউজার MediaRecorder API সাপোর্ট করে না। অনুগ্রহ করে Chrome বা Edge ব্যবহার করুন।');
       return;
     }
+
+    setRecorderErrorMsg(null);
+    setMicFallbackNotice(null);
 
     setIsRecording(true);
     setIsRecordingPaused(false);
@@ -1454,8 +1678,56 @@ export const ZeroCostVideoStudio: React.FC = () => {
     carrierGain.connect(audioDest);
     carrierOsc.start();
 
-    // Ambient studio atmospheric synth music track
-    if (enableSound) {
+    // ------------------------------------------
+    // YOUTUBE & BACKGROUND MUSIC ROUTING
+    // ------------------------------------------
+    const currentMusicCfg = musicConfigRef.current;
+    if (currentMusicCfg.enabled && currentMusicCfg.selectedTrack) {
+      const musicMasterGain = ctx.createGain();
+      const baseMusicGain = currentMusicCfg.musicVolume;
+      musicMasterGain.gain.setValueAtTime(baseMusicGain, ctx.currentTime);
+      musicMasterGain.connect(audioDest);
+      musicMasterGain.connect(ctx.destination);
+
+      // Smart Audio Ducking logic: lowers music volume during voice
+      if (currentMusicCfg.enableDucking) {
+        const isVoiceActive = audioSourceMode === 'record-clip' || audioSourceMode === 'live-mic' || enableVoiceover;
+        if (isVoiceActive) {
+          const duckGain = Math.max(0.03, baseMusicGain * 0.28);
+          musicMasterGain.gain.setValueAtTime(duckGain, ctx.currentTime);
+          const voiceDuration = Math.min(totalSceneDuration, 16);
+          musicMasterGain.gain.setValueAtTime(duckGain, ctx.currentTime + voiceDuration - 0.5);
+          musicMasterGain.gain.linearRampToValueAtTime(baseMusicGain, ctx.currentTime + voiceDuration + 0.8);
+        }
+      }
+
+      // Check if user uploaded a custom YouTube audio file
+      if (currentMusicCfg.customAudioFile) {
+        try {
+          const arrayBuf = await currentMusicCfg.customAudioFile.arrayBuffer();
+          const decoded = await ctx.decodeAudioData(arrayBuf);
+          const bgSource = ctx.createBufferSource();
+          bgSource.buffer = decoded;
+          bgSource.loop = currentMusicCfg.loop;
+          bgSource.connect(musicMasterGain);
+          bgSource.start(ctx.currentTime + 0.05);
+          backgroundAudioSourceNodeRef.current = bgSource;
+        } catch (e) {
+          console.warn('Error decoding custom YouTube audio file:', e);
+        }
+      } else {
+        // Play procedural/curated YouTube synthesizer preset
+        const player = new ProceduralMusicPlayer();
+        proceduralMusicPlayerRef.current = player;
+        player.start(
+          ctx,
+          musicMasterGain,
+          currentMusicCfg.selectedTrack.proceduralPreset,
+          1.0
+        );
+      }
+    } else if (enableSound) {
+      // Fallback ambient pad
       const padOsc = ctx.createOscillator();
       const padGain = ctx.createGain();
       const padFilter = ctx.createBiquadFilter();
@@ -1479,7 +1751,7 @@ export const ZeroCostVideoStudio: React.FC = () => {
         const sourceNode = ctx.createBufferSource();
         sourceNode.buffer = decoded;
         const voiceGain = ctx.createGain();
-        voiceGain.gain.setValueAtTime(1.0, ctx.currentTime);
+        voiceGain.gain.setValueAtTime(currentMusicCfg.voiceVolume, ctx.currentTime);
         sourceNode.connect(voiceGain);
         voiceGain.connect(audioDest);
         voiceGain.connect(ctx.destination);
@@ -1499,18 +1771,20 @@ export const ZeroCostVideoStudio: React.FC = () => {
         liveMicStreamRef.current = micStream;
         const micSource = ctx.createMediaStreamSource(micStream);
         const micGain = ctx.createGain();
-        micGain.gain.setValueAtTime(1.0, ctx.currentTime);
+        micGain.gain.setValueAtTime(currentMusicCfg.voiceVolume, ctx.currentTime);
         micSource.connect(micGain);
         micGain.connect(audioDest);
-      } catch (err) {
-        console.warn('Error acquiring live mic during recording:', err);
+      } catch (err: any) {
+        console.warn('Live mic permission unavailable during recording, falling back to procedural audio voice:', err?.message || err);
+        playProceduralBengaliVoice(ctx, audioDest, totalSceneDuration);
+        setMicFallbackNotice('মাইক্রোফোন অনুমতি না থাকায় ব্যাকগ্রাউন্ড মিউজিক ও এআই অডিও সহ ভিডিও সফলভাবে রেকর্ড করা হচ্ছে।');
       }
     } else if (audioSourceMode === 'upload-audio' && uploadedAudioBuffer) {
       try {
         const sourceNode = ctx.createBufferSource();
         sourceNode.buffer = uploadedAudioBuffer;
         const uploadGain = ctx.createGain();
-        uploadGain.gain.setValueAtTime(1.0, ctx.currentTime);
+        uploadGain.gain.setValueAtTime(currentMusicCfg.voiceVolume, ctx.currentTime);
         sourceNode.connect(uploadGain);
         uploadGain.connect(audioDest);
         uploadGain.connect(ctx.destination);
@@ -2011,7 +2285,7 @@ export const ZeroCostVideoStudio: React.FC = () => {
             </div>
 
             {/* Voice Source Selector Tabs */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-xs">
               <button
                 type="button"
                 onClick={() => setAudioSourceMode('record-clip')}
@@ -2075,7 +2349,96 @@ export const ZeroCostVideoStudio: React.FC = () => {
                   <div className="text-[9px] text-slate-400 font-normal">ওয়েব অডিও ফরম্যান্ট</div>
                 </div>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenAudioStudio) {
+                    onOpenAudioStudio();
+                  }
+                }}
+                className="flex items-center gap-2 rounded-xl border border-purple-500/40 bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 p-2.5 font-semibold transition-all col-span-2 sm:col-span-1"
+                title="৩০ সেকেন্ডের অডিও গান কম্পোজিশন ইঞ্জিন চালু করুন"
+              >
+                <Music className="h-4 w-4 text-purple-400" />
+                <div className="text-left">
+                  <div className="text-[11px] leading-tight font-bold">৩০সে. গান ইঞ্জিন</div>
+                  <div className="text-[9px] text-purple-400/90 font-normal">যেকোনো গান তৈরি</div>
+                </div>
+              </button>
             </div>
+
+            {/* Microphone Permission Warning / Alternative Actions Card */}
+            {micErrorMessage && (
+              <div className="rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 to-slate-900 p-3 space-y-2.5 text-xs text-amber-200 shadow-lg animate-fadeIn">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 mt-0.5">
+                      <MicOff className="h-3.5 w-3.5" />
+                    </span>
+                    <div>
+                      <div className="font-bold text-amber-300">
+                        মাইক্রোফোন অনুমতি দেওয়া হয়নি বা অনুপলব্ধ (Permission Denied)
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                        {micErrorMessage}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMicErrorMessage(null)}
+                    className="text-slate-400 hover:text-white p-1 rounded-md"
+                    title="বার্তা লুকান"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-amber-500/20">
+                  <span className="text-[10px] text-slate-400 font-medium mr-1">
+                    বিকল্প বেছে নিন:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAudioSourceMode('ai-synth');
+                      setMicErrorMessage(null);
+                    }}
+                    className="flex items-center gap-1 rounded-lg bg-purple-600 hover:bg-purple-500 px-2.5 py-1 text-[11px] font-bold text-white shadow transition-all"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    <span>এআই সিন্থ ভয়েস সক্রিয় করুন</span>
+                  </button>
+
+                  {onOpenAudioStudio && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenAudioStudio();
+                        setMicErrorMessage(null);
+                      }}
+                      className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 px-2.5 py-1 text-[11px] font-bold text-white shadow transition-all"
+                    >
+                      <Music className="h-3 w-3" />
+                      <span>৩০সে. অডিও গান ইঞ্জিন খুলুন</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAudioSourceMode('upload-audio');
+                      setMicErrorMessage(null);
+                    }}
+                    className="flex items-center gap-1 rounded-lg bg-amber-600 hover:bg-amber-500 px-2.5 py-1 text-[11px] font-bold text-white shadow transition-all"
+                  >
+                    <Upload className="h-3 w-3" />
+                    <span>অডিও ফাইল আপলোড করুন</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* TAB 1: In-Studio Voice Clip Recorder Tool */}
             {audioSourceMode === 'record-clip' && (
@@ -2210,6 +2573,15 @@ export const ZeroCostVideoStudio: React.FC = () => {
             )}
           </div>
 
+          {/* ============================================================ */}
+          {/* FEATURE 2: ইউটিউব ব্যাকগ্রাউন্ড মিউজিক ও অডিও হাব */}
+          {/* ============================================================ */}
+          <YouTubeMusicHub
+            config={musicConfig}
+            onChange={setMusicConfig}
+            onOpenAudioStudio={onOpenAudioStudio}
+          />
+
           {/* DIGITAL HUMAN AVATAR SETTINGS */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-xl space-y-3">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
@@ -2248,11 +2620,12 @@ export const ZeroCostVideoStudio: React.FC = () => {
                   <label className="text-xs font-semibold text-slate-400 mb-1.5 block">
                     উপস্থাপক নির্বাচন করুন:
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { id: 'farzana', name: 'ফারজানা', role: 'সংবাদ উপস্থাপিকা' },
                       { id: 'rafi', name: 'রাফি', role: 'সাইবার বিশেষজ্ঞ' },
                       { id: 'sheikh-farid', name: 'শেখ ফরিদ', role: 'এআই লিড' },
+                      { id: 'custom-photo', name: '👤 নিজের ছবি', role: 'যেকোনো মানুষ' },
                     ].map((av) => (
                       <button
                         key={av.id}
@@ -2264,12 +2637,87 @@ export const ZeroCostVideoStudio: React.FC = () => {
                             : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
                         }`}
                       >
-                        <div className="text-xs font-bold">{av.name}</div>
+                        <div className="text-xs font-bold truncate">{av.name}</div>
                         <div className="text-[9px] text-slate-500 truncate">{av.role}</div>
                       </button>
                     ))}
                   </div>
                 </div>
+
+                {/* Custom Photo Presenter Upload & 1-Click Styles */}
+                {selectedAvatar === 'custom-photo' && (
+                  <div className="p-3 rounded-xl bg-slate-950 border border-cyan-500/30 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-cyan-300 flex items-center gap-1.5">
+                        <Upload className="h-3.5 w-3.5 text-cyan-400" />
+                        <span>যেকোনো মানুষের ছবি আপলোড করুন:</span>
+                      </span>
+                      {customPresenterPhotoUrl && (
+                        <span className="text-[10px] text-emerald-400 font-bold">✓ ছবি যুক্ত হয়েছে</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {customPresenterPhotoUrl ? (
+                        <div className="relative h-14 w-14 shrink-0 rounded-xl overflow-hidden border-2 border-cyan-400 shadow-md">
+                          <img
+                            src={customPresenterPhotoUrl}
+                            alt="Custom presenter"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-900 text-slate-500">
+                          <User className="h-6 w-6" />
+                        </div>
+                      )}
+
+                      <div className="flex-1 space-y-1.5">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePresenterPhotoUpload}
+                          className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-400 shrink-0">নাম:</span>
+                          <input
+                            type="text"
+                            value={customPresenterName}
+                            onChange={(e) => setCustomPresenterName(e.target.value)}
+                            placeholder="উপস্থাপকের নাম লিখুন"
+                            className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 1-Click Instant Styles for Uploaded Photo */}
+                    <div className="border-t border-slate-800/80 pt-2">
+                      <div className="text-[10px] text-slate-400 mb-1.5 font-medium">
+                        🎨 ১-ক্লিকে যেকোনো স্টাইলের ভিডিও তৈরি করুন:
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {[
+                          { id: 'news', label: '📺 টিভি নিউজ স্টুডিও', style: 'news' as const },
+                          { id: 'cyberpunk', label: '🌌 সাইবার নিয়ন', style: 'cyberpunk' as const },
+                          { id: 'noir', label: '🎬 সিনেমাটিক নয়ার', style: 'noir' as const },
+                          { id: 'sepia', label: '📜 ভিন্টেজ সেপিয়া', style: 'sepia' as const },
+                          { id: 'viral', label: '🔥 ভাইরাল রিল স্টাইল', style: 'viral' as const },
+                        ].map((st) => (
+                          <button
+                            key={st.id}
+                            type="button"
+                            onClick={() => applyPhotoStyle(st.style)}
+                            className="rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/50 p-1.5 text-[10px] font-semibold text-slate-300 hover:text-white transition-all text-left"
+                          >
+                            {st.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
@@ -2406,6 +2854,12 @@ export const ZeroCostVideoStudio: React.FC = () => {
                     ? 'আপলোড অডিও'
                     : 'এআই সিন্থ'}
                 </span>
+                {musicConfig.enabled && musicConfig.selectedTrack && (
+                  <span className="flex items-center gap-1 text-red-400 bg-red-950/50 px-2 py-0.5 rounded border border-red-500/30">
+                    <Music className="h-3 w-3" />
+                    <span className="truncate max-w-[120px]">{musicConfig.customAudioName || musicConfig.selectedTrack.titleBn}</span>
+                  </span>
+                )}
                 <span>
                   {aspectRatio} ({canvasWidth}x{canvasHeight})
                 </span>
@@ -2414,7 +2868,7 @@ export const ZeroCostVideoStudio: React.FC = () => {
 
             {/* CanvasRecorder Toolbar: Quality, Engine Info & Frame Snapshot */}
             <div className="w-full mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-950/80 p-2.5 border border-slate-800">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-1 rounded border border-emerald-500/30">
                   <Video className="h-3.5 w-3.5" />
                   <span>CanvasRecorder</span>
@@ -2422,6 +2876,31 @@ export const ZeroCostVideoStudio: React.FC = () => {
                 <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
                   {getOptimalMimeType() ? getOptimalMimeType().split(';')[0] : 'MediaRecorder'} • $০ সার্ভার
                 </span>
+                {isFilterActive(colorFilterConfig) && (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-pink-400 bg-pink-950/60 px-2 py-0.5 rounded border border-pink-500/30 animate-pulse">
+                    <Palette className="h-3 w-3" />
+                    <span>
+                      {colorFilterConfig.grayscale > 0
+                        ? '🏁 Grayscale'
+                        : colorFilterConfig.sepia > 0
+                        ? '📜 Sepia'
+                        : colorFilterConfig.invert > 0
+                        ? '⚡ Invert'
+                        : '🎨 Filter On'}
+                    </span>
+                  </span>
+                )}
+                {musicConfig.enabled && musicConfig.selectedTrack && (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-950/60 px-2 py-0.5 rounded border border-red-500/30">
+                    <Music className="h-3 w-3" />
+                    <span className="truncate max-w-[120px]">
+                      {musicConfig.customAudioName || musicConfig.selectedTrack.titleBn}
+                    </span>
+                    <span className="text-[9px] text-red-300 font-mono">
+                      {Math.round(musicConfig.musicVolume * 100)}%
+                    </span>
+                  </span>
+                )}
               </div>
 
               {/* Quality & FPS Presets */}
@@ -2541,6 +3020,39 @@ export const ZeroCostVideoStudio: React.FC = () => {
               )}
             </div>
 
+            {/* Mic Fallback & Recorder Error Notices */}
+            {micFallbackNotice && (
+              <div className="w-full mt-3 rounded-xl border border-amber-500/40 bg-amber-950/40 p-2.5 text-xs text-amber-200 flex items-center justify-between shadow-md">
+                <span className="flex items-center gap-1.5">
+                  <MicOff className="h-4 w-4 text-amber-400 shrink-0" />
+                  <span>{micFallbackNotice}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMicFallbackNotice(null)}
+                  className="text-amber-400 hover:text-white text-xs px-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {recorderErrorMsg && (
+              <div className="w-full mt-3 rounded-xl border border-red-500/40 bg-red-950/40 p-2.5 text-xs text-red-200 flex items-center justify-between shadow-md">
+                <span className="flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                  <span>{recorderErrorMsg}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRecorderErrorMsg(null)}
+                  className="text-red-400 hover:text-white text-xs px-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* Action Buttons: Record & Export */}
             <div className="w-full mt-5 flex flex-wrap gap-3 items-center justify-between border-t border-slate-800 pt-4">
               <div className="flex items-center gap-2">
@@ -2578,6 +3090,14 @@ export const ZeroCostVideoStudio: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Real-Time Color Filters Controls Panel (Grayscale, Sepia, Invert, Sliders) */}
+            <ColorFilterControls
+              config={colorFilterConfig}
+              onChange={setColorFilterConfig}
+              className="w-full mt-4"
+              defaultExpanded={false}
+            />
 
             {/* Generated Video Player Preview with Metadata */}
             {recordedVideoUrl && (

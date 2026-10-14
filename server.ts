@@ -265,6 +265,58 @@ app.get('/api/workspace/gmail/labels', async (req: Request, res: Response): Prom
   }
 });
 
+/**
+ * YouTube Music & Audio Resolver API
+ * Resolves YouTube video metadata (title, author, thumbnail, videoId, embedUrl)
+ * for mixing background music with the video.
+ */
+app.get('/api/youtube/info', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const rawUrl = String(req.query.url || '').trim();
+    if (!rawUrl) {
+      res.status(400).json({ error: 'YouTube URL is required' });
+      return;
+    }
+
+    // Extract video ID from standard watch, share youtu.be, or shorts link
+    let videoId = '';
+    const match = rawUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
+    if (match && match[1]) {
+      videoId = match[1];
+    }
+
+    const cleanUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : rawUrl;
+
+    // Use YouTube oEmbed API
+    const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(cleanUrl)}&format=json`);
+    if (!oembedRes.ok) {
+      res.status(404).json({
+        error: 'ইউটিউব ভিডিও পাওয়া যায়নি। অনুগ্রহ করে সঠিক লিঙ্ক দিন।',
+      });
+      return;
+    }
+
+    const oembedData: any = await oembedRes.json();
+    res.json({
+      success: true,
+      videoId,
+      title: oembedData.title,
+      author: oembedData.author_name,
+      authorUrl: oembedData.author_url,
+      thumbnailUrl: videoId
+        ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+        : oembedData.thumbnail_url,
+      embedUrl: videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1` : null,
+      provider: 'YouTube',
+    });
+  } catch (error: any) {
+    console.error('Error fetching YouTube info:', error);
+    res.status(500).json({
+      error: 'ইউটিউব তথ্য লোড করতে সমস্যা হয়েছে: ' + (error?.message || ''),
+    });
+  }
+});
+
 // Mount Vite or static files
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

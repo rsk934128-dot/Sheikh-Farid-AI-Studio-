@@ -269,6 +269,24 @@ export const SHEIKH_PROJECTS: SheikhProject[] = [
     liveDemoUrl: '#',
     iconName: 'LayoutGrid',
   },
+  {
+    id: 'audio-engine-30s',
+    title: '30s Audio Engine & Music Studio',
+    tagline: 'Procedural Multi-Track Web Audio Synthesizer for Video Creators',
+    badge: 'Audio Engine',
+    status: 'Production',
+    techStack: ['Web Audio API', 'Oscillator Nodes', 'BiquadFilter', 'Procedural Audio', 'MediaRecorder'],
+    description: 'সম্পূর্ণ $০ খরচে ক্লায়েন্ট-সাইড ৩০ সেকেন্ডের মিউজিক কম্পোজিশন ইঞ্জিন। বাউল, পল্লী সুর, ব্রেকিং নিউজ, লো-ফাই ও সিনেমাটিক অডিও তৈরি ও রপ্তানি।',
+    highlights: [
+      '৩০ সেকেন্ডের পূর্ণাঙ্গ কাঠামো (Intro -> Verse -> Chorus -> Outro)',
+      'ভৈরব রাগ, পেন্টাটনিক ও মাইনর স্কেল পলিমেলোডি',
+      '১-ক্লিকে প্রম্পট বা জঁর ভিত্তিক মিউজিক তৈরি',
+      'সরাসরি ক্যানভাস ভিডিও স্টুডিওতে সিঙ্ক এবং .webm এক্সপোর্ট',
+    ],
+    githubUrl: 'https://github.com/sf0745026/30s-audio-engine',
+    liveDemoUrl: '#',
+    iconName: 'Cpu',
+  },
 ];
 
 export const ZERO_LATENCY_CACHE: Record<string, string> = {

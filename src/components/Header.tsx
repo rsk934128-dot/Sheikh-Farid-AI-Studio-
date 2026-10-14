@@ -11,6 +11,7 @@ import {
   User,
   CheckCircle2,
   Terminal,
+  Music,
 } from 'lucide-react';
 import { ActiveTab } from '../types';
 
@@ -33,6 +34,14 @@ export const Header: React.FC<HeaderProps> = ({
       icon: Film,
       badge: '$০ খরচ',
       badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    },
+    {
+      id: '30s-audio-engine' as ActiveTab,
+      label: '৩০সে. অডিও গান ইঞ্জিন',
+      labelEn: '30s Audio Studio',
+      icon: Music,
+      badge: 'গান তৈরি',
+      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
     },
     {
       id: 'video-analyzer' as ActiveTab,

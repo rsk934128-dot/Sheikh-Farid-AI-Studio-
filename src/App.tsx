@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ZeroCostVideoStudio } from './components/ZeroCostVideoStudio';
+import { ThirtySecondAudioStudio } from './components/ThirtySecondAudioStudio';
 import { VideoAnalyzer } from './components/VideoAnalyzer';
 import { AILab } from './components/AILab';
 import { CitizenDesk } from './components/CitizenDesk';
@@ -13,6 +14,12 @@ import { Wifi, WifiOff, Sparkles, Download } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('zero-cost-video-creator');
+  const [appliedAudioTrack, setAppliedAudioTrack] = useState<{
+    title: string;
+    blob?: Blob;
+    url?: string;
+    presetKey: string;
+  } | null>(null);
   const [isArchitectOpen, setIsArchitectOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -93,7 +100,20 @@ export default function App() {
 
       {/* Active Tab View */}
       <main className="flex-1 pb-16">
-        {activeTab === 'zero-cost-video-creator' && <ZeroCostVideoStudio />}
+        {activeTab === 'zero-cost-video-creator' && (
+          <ZeroCostVideoStudio
+            initialAudioTrack={appliedAudioTrack}
+            onOpenAudioStudio={() => setActiveTab('30s-audio-engine')}
+          />
+        )}
+        {activeTab === '30s-audio-engine' && (
+          <ThirtySecondAudioStudio
+            onApplyToVideoStudio={(track) => {
+              setAppliedAudioTrack(track);
+              setActiveTab('zero-cost-video-creator');
+            }}
+          />
+        )}
         {activeTab === 'video-analyzer' && <VideoAnalyzer />}
         {activeTab === 'ai-lab' && <AILab />}
         {activeTab === 'citizendesk' && <CitizenDesk />}
