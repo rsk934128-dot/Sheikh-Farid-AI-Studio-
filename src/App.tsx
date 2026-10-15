@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Header } from './components/Header';
 import { ZeroCostVideoStudio } from './components/ZeroCostVideoStudio';
 import { ThirtySecondAudioStudio } from './components/ThirtySecondAudioStudio';
@@ -188,6 +189,9 @@ export default function App() {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
       />
+
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 }
