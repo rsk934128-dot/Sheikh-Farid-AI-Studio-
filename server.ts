@@ -1,9 +1,12 @@
+import http from 'http';
+import fs from 'fs';
 import express, { Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { WebSocketServer, WebSocket as WsWebSocket } from 'ws';
 
 dotenv.config();
 
@@ -37,6 +40,35 @@ app.get('/api/health', (req: Request, res: Response) => {
     geminiConfigured: Boolean(apiKey),
   });
 });
+
+// Path to official Studio Logo asset
+const LOGO_ASSET_PATH = path.resolve(__dirname, 'src', 'assets', 'images', 'sheikh_farid_logo_1792083190919.jpg');
+
+// Dedicated endpoints for Favicon, Logo & Social Previews
+app.get(
+  [
+    '/favicon.ico',
+    '/favicon.png',
+    '/logo.jpg',
+    '/logo.png',
+    '/apple-touch-icon.png',
+    '/apple-touch-icon-precomposed.png',
+  ],
+  (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.sendFile(LOGO_ASSET_PATH);
+  }
+);
+
+// PWA Manifest Endpoint
+app.get('/manifest.json', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.sendFile(path.resolve(__dirname, 'public', 'manifest.json'));
+});
+
+// Static assets handler for client images and logos
+app.use('/src/assets', express.static(path.resolve(__dirname, 'src', 'assets')));
 
 /**
  * Video Analysis Endpoint
@@ -317,8 +349,312 @@ app.get('/api/youtube/info', async (req: Request, res: Response): Promise<void> 
   }
 });
 
+/**
+ * =========================================================================
+ * 📡 LIVE STUDIO & BROADCAST ENGINE APIS & WEBSOCKET SIGNALING SERVER
+ * =========================================================================
+ */
+
+// AI Live Co-Pilot: Generate Live Interview Questions, Breaking Tickers & Lower Thirds
+app.post('/api/live/generate-topics', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { topic = 'রিয়েল-টাইম মিডিয়া স্ট্রিমিং ও এআই প্রযুক্তির ভবিষ্যৎ', broadcastType = 'talk-show' } = req.body;
+
+    const prompt = `You are the executive producer of Sheikh Farid Broadcast Studio (শেখ ফরিদ ব্রডকাস্ট স্টুডিও).
+Topic: "${topic}"
+Broadcast Format: "${broadcastType}"
+
+Generate broadcast graphics content and questions in Bengali (বাংলা).
+Output pure valid JSON in this exact structure without markdown backticks:
+{
+  "tickerHeadlines": [
+    "ব্রেকিং নিউজ: ... (under 80 chars)",
+    "বিশেষ প্রতিবেদন: ... (under 80 chars)",
+    "লাইভ আপডেট: ... (under 80 chars)"
+  ],
+  "interviewQuestions": [
+    "প্রশ্ন ১: ...",
+    "প্রশ্ন ২: ...",
+    "প্রশ্ন ৩: ...",
+    "প্রশ্ন ৪: ..."
+  ],
+  "lowerThirdPreset": {
+    "title": "...",
+    "subtitle": "...",
+    "categoryBadge": "..."
+  },
+  "audiencePoll": {
+    "question": "...",
+    "options": ["হ্যাঁ", "না", "মন্তব্য নেই"]
+  }
+}`;
+
+    let resultJson: any = null;
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          temperature: 0.3,
+        },
+      });
+      const text = response.text || '';
+      const cleanJson = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+      resultJson = JSON.parse(cleanJson);
+    } catch (geminiError: any) {
+      console.warn('Gemini topic generation fallback:', geminiError?.message);
+      resultJson = {
+        tickerHeadlines: [
+          `ব্রেকিং নিউজ: ${topic} নিয়ে লাইভ আলোচনা চলছে শেখ ফরিদ স্টুডিওতে`,
+          'বিশেষ সম্প্রচার: ৬০ এফপিএস ফুল-এইচডি ক্যানভাস স্ট্রিমিং ও ওয়েবআরটিসি সংযোগ সক্রিয়',
+          'দর্শকদের মতামত: কমেন্ট করুন এবং সরাসরি অন-স্ক্রিনে আপনার নাম ও মতামত প্রদর্শন করুন',
+        ],
+        interviewQuestions: [
+          `${topic} ক্ষেত্রে প্রধান প্রযুক্তিগত চ্যালেঞ্জ ও সুযোগগুলো কী কী?`,
+          'কম লেটেন্সি (Ultra-low latency) নিশ্চিত করতে কোন আর্কিটেকচার সবচেয়ে কার্যকর?',
+          'এআই এবং অটোমেশন কীভাবে ব্রডকাস্টিং ইন্ডাস্ট্রিকে বদলে দিচ্ছে?',
+          'ভবিষ্যৎ প্ল্যাটফর্ম হিসেবে নিজস্ব স্টুডিও তৈরি করার মূল কৌশল কী?',
+        ],
+        lowerThirdPreset: {
+          title: 'শেখ ফরিদ • প্রধান আর্কিটেক্ট',
+          subtitle: topic,
+          categoryBadge: 'বিশেষ লাইভ টকশো',
+        },
+        audiencePoll: {
+          question: 'আপনি কি মনে করেন ব্রাউজার-ভিত্তিক স্টুডিও কনভেনশনাল ওবিএস স্টুডিওকে রিপ্লেস করতে পারবে?',
+          options: ['হ্যাঁ, শতভাগ সম্ভব', 'না, এখনও সময় লাগবে', 'উভয়ের মেলবন্ধন সেরা'],
+        },
+      };
+    }
+
+    res.json({ success: true, data: resultJson });
+  } catch (error: any) {
+    console.error('Error generating live topics:', error);
+    res.status(500).json({ error: 'লাইভ টপিক জেনারেট করতে সমস্যা হয়েছে: ' + (error?.message || '') });
+  }
+});
+
+// RTMP & Stream Transcoder Endpoints Info
+app.get('/api/live/rtmp-info', (req: Request, res: Response) => {
+  res.json({
+    destinations: [
+      {
+        platform: 'YouTube Live',
+        rtmpUrl: 'rtmp://a.rtmp.youtube.com/live2',
+        protocol: 'RTMP / RTMPS',
+        recommendedResolution: '1920x1080 (1080p60)',
+        bitrate: '4500 - 6000 kbps',
+      },
+      {
+        platform: 'Facebook Live',
+        rtmpUrl: 'rtmps://live-api-s.facebook.com:443/rtmp/',
+        protocol: 'RTMPS (SSL Enforced)',
+        recommendedResolution: '1920x1080 (1080p30/60)',
+        bitrate: '4000 kbps',
+      },
+      {
+        platform: 'Twitch / Custom RTMP',
+        rtmpUrl: 'rtmp://live.twitch.tv/app/',
+        protocol: 'RTMP',
+        recommendedResolution: '1920x1080 (1080p60)',
+        bitrate: '6000 kbps',
+      },
+    ],
+    ffmpegRelaySnippet: `ffmpeg -f webm -i input_canvas_stream.webm -c:v libx264 -preset veryfast -b:v 4500k -maxrate 4500k -bufsize 9000k -pix_fmt yuv420p -g 60 -c:a aac -b:a 192k -ar 44100 -f flv "rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY"`,
+  });
+});
+
 // Mount Vite or static files
 async function startServer() {
+  const server = http.createServer(app);
+
+  // WebSocket Signaling Server for WebRTC, Dynamic Overlays & Live Chat
+  const wss = new WebSocketServer({ server, path: '/ws/broadcast' });
+
+  interface PeerConnection {
+    id: string;
+    ws: WsWebSocket;
+    roomId: string;
+    role: 'host' | 'guest' | 'viewer';
+    name: string;
+  }
+
+  const peers = new Map<string, PeerConnection>();
+
+  wss.on('connection', (ws: WsWebSocket) => {
+    let currentPeerId: string | null = null;
+    let currentRoomId: string | null = null;
+
+    ws.on('message', (rawData: string) => {
+      try {
+        const msg = JSON.parse(rawData.toString());
+
+        switch (msg.type) {
+          case 'join-room': {
+            const { roomId, clientId, role, name } = msg;
+            currentPeerId = clientId;
+            currentRoomId = roomId;
+
+            peers.set(clientId, {
+              id: clientId,
+              ws,
+              roomId,
+              role: role || 'guest',
+              name: name || (role === 'host' ? 'হোস্ট (Sheikh Farid)' : 'অতিথি গেস্ট'),
+            });
+
+            // Gather other peers in the room
+            const peersInRoom: Array<{ id: string; role: string; name: string }> = [];
+            peers.forEach((peer) => {
+              if (peer.roomId === roomId && peer.id !== clientId) {
+                peersInRoom.push({ id: peer.id, role: peer.role, name: peer.name });
+              }
+            });
+
+            // Notify joining client with current room members
+            ws.send(JSON.stringify({
+              type: 'room-state',
+              peers: peersInRoom,
+            }));
+
+            // Broadcast to other peers that a new user joined
+            peers.forEach((peer) => {
+              if (peer.roomId === roomId && peer.id !== clientId && peer.ws.readyState === WsWebSocket.OPEN) {
+                peer.ws.send(JSON.stringify({
+                  type: 'peer-joined',
+                  peer: { id: clientId, role: role || 'guest', name: name || 'অতিথি গেস্ট' },
+                }));
+              }
+            });
+            break;
+          }
+
+          case 'webrtc-signal': {
+            // Forward signal directly to target peer
+            const { targetId, senderId, signalData } = msg;
+            const targetPeer = peers.get(targetId);
+            if (targetPeer && targetPeer.ws.readyState === WsWebSocket.OPEN) {
+              targetPeer.ws.send(JSON.stringify({
+                type: 'webrtc-signal',
+                senderId,
+                signalData,
+              }));
+            }
+            break;
+          }
+
+          case 'chat-message': {
+            const { roomId } = msg;
+            peers.forEach((peer) => {
+              if (peer.roomId === roomId && peer.ws.readyState === WsWebSocket.OPEN) {
+                peer.ws.send(JSON.stringify({
+                  type: 'chat-message',
+                  message: msg.message,
+                }));
+              }
+            });
+            break;
+          }
+
+          case 'overlay-sync': {
+            const { roomId, overlay } = msg;
+            peers.forEach((peer) => {
+              if (peer.roomId === roomId && peer.ws.readyState === WsWebSocket.OPEN) {
+                peer.ws.send(JSON.stringify({
+                  type: 'overlay-sync',
+                  overlay,
+                }));
+              }
+            });
+            break;
+          }
+
+          case 'push-comment-to-screen': {
+            const { roomId, comment } = msg;
+            peers.forEach((peer) => {
+              if (peer.roomId === roomId && peer.ws.readyState === WsWebSocket.OPEN) {
+                peer.ws.send(JSON.stringify({
+                  type: 'push-comment-to-screen',
+                  comment,
+                }));
+              }
+            });
+            break;
+          }
+
+          case 'push-reaction': {
+            const { roomId, reaction } = msg;
+            peers.forEach((peer) => {
+              if (peer.roomId === roomId && peer.ws.readyState === WsWebSocket.OPEN) {
+                peer.ws.send(JSON.stringify({
+                  type: 'push-reaction',
+                  reaction,
+                }));
+              }
+            });
+            break;
+          }
+        }
+      } catch (err) {
+        console.error('Error handling WebSocket broadcast message:', err);
+      }
+    });
+
+    ws.on('close', () => {
+      if (currentPeerId) {
+        peers.delete(currentPeerId);
+        if (currentRoomId) {
+          peers.forEach((peer) => {
+            if (peer.roomId === currentRoomId && peer.ws.readyState === WsWebSocket.OPEN) {
+              peer.ws.send(JSON.stringify({
+                type: 'peer-left',
+                peerId: currentPeerId,
+              }));
+            }
+          });
+        }
+      }
+    });
+  });
+
+  // Social Crawler middleware for WhatsApp, Facebook, Twitter, Telegram, LinkedIn, Discord
+  app.use(async (req: Request, res: Response, next) => {
+    const ua = (req.headers['user-agent'] as string) || '';
+    const crawlers = [
+      'facebookexternalhit',
+      'facebot',
+      'whatsapp',
+      'twitterbot',
+      'telegrambot',
+      'linkedinbot',
+      'discordbot',
+      'slackbot',
+      'skypeuripreview',
+    ];
+    const isSocialBot = crawlers.some((bot) => ua.toLowerCase().includes(bot));
+    const isRootReq = req.path === '/' || req.path === '/index.html';
+
+    if (isSocialBot && isRootReq) {
+      try {
+        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        const host = req.get('host') || `localhost:${PORT}`;
+        const origin = `${proto}://${host}`;
+        const indexPath = process.env.NODE_ENV === 'production'
+          ? path.resolve(__dirname, 'dist', 'index.html')
+          : path.resolve(__dirname, 'index.html');
+
+        let html = await fs.promises.readFile(indexPath, 'utf-8');
+        html = html.replace(/content="\/logo\.jpg"/g, `content="${origin}/logo.jpg"`);
+        html = html.replace(/href="\/logo\.jpg"/g, `href="${origin}/logo.jpg"`);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.send(html);
+      } catch (e) {
+        return next();
+      }
+    }
+    next();
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -332,8 +668,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Sheikh Farid AI Studio & Project Hub server running on port ${PORT}`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Sheikh Farid AI Studio & Live Broadcast Hub running on port ${PORT}`);
   });
 }
 

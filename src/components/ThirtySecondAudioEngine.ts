@@ -618,3 +618,7 @@ export class ThirtySecondSongEngine {
     });
   }
 }
+
+// Export alias for convenient multi-component referencing
+export const ThirtySecondAudioEngine = ThirtySecondSongEngine;
+export type ThirtySecondAudioEngine = ThirtySecondSongEngine;

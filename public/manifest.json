@@ -1,0 +1,37 @@
+{
+  "name": "Sheikh Farid AI Studio & Project Hub",
+  "short_name": "SF Studio",
+  "description": "মিনি মাইক্রোসফট • হাই-প্রিসিশন লোকাল এআই • গভটেক ইকোসিস্টেম • ভিডিও এনালাইসিস ও প্রোডাক্টিভিটি স্যুট",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020617",
+  "theme_color": "#10b981",
+  "categories": ["productivity", "utilities", "multimedia"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

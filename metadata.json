@@ -1,6 +1,6 @@
 {
   "name": "Sheikh Farid AI Studio & Project Hub",
   "description": "মিনি মাইক্রোসফট • হাই-প্রিসিশন লোকাল এআই • গভটেক ইকোসিস্টেম • ভিডিও এনালাইসিস ও প্রোডাক্টিভিটি স্যুট",
-  "requestFramePermissions": ["microphone"],
+  "requestFramePermissions": ["microphone", "camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

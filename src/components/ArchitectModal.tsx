@@ -31,10 +31,13 @@ export const ArchitectModal: React.FC<ArchitectModalProps> = ({ isOpen, onClose 
 
         {/* Profile Header */}
         <div className="flex items-center gap-4 border-b border-slate-800 pb-5">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 p-0.5 shadow-xl">
-            <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-slate-950 font-extrabold text-xl text-emerald-400">
-              SF
-            </div>
+          <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/40 bg-slate-950 p-1 shadow-xl shadow-emerald-950/60 overflow-hidden">
+            <img
+              src="/src/assets/images/sheikh_farid_logo_1792083190919.jpg"
+              alt="Sheikh Farid Studio Official Logo"
+              referrerPolicy="no-referrer"
+              className="h-full w-full object-cover rounded-xl"
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">

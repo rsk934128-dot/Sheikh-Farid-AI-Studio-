@@ -1,12 +1,42 @@
 export type ActiveTab =
   | 'video-analyzer'
   | 'zero-cost-video-creator'
+  | 'live-studio'
   | '30s-audio-engine'
   | 'ai-lab'
   | 'citizendesk'
   | 'gmail'
   | 'project-hub'
   | 'vpn-studio';
+
+export interface LiveStreamOverlay {
+  showLiveBadge: boolean;
+  showLogo: boolean;
+  logoText: string;
+  showTicker: boolean;
+  tickerText: string;
+  tickerSpeed: number; // 1-5
+  showLowerThird: boolean;
+  lowerThirdTitle: string;
+  lowerThirdSubtitle: string;
+  lowerThirdTheme: 'broadcast-red' | 'cyber-neon' | 'royal-gold' | 'minimal-dark';
+  activeCommentOnScreen: {
+    userName: string;
+    comment: string;
+    avatarUrl?: string;
+    timestamp: string;
+  } | null;
+  layout: 'split-screen' | 'solo-anchor' | 'pip' | 'grid';
+}
+
+export interface LiveChatMessage {
+  id: string;
+  user: string;
+  message: string;
+  timestamp: string;
+  isHost?: boolean;
+  onScreen?: boolean;
+}
 
 export interface SampleVideo {
   id: string;

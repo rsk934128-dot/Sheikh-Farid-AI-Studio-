@@ -12,6 +12,7 @@ import {
   Sparkles,
   ArrowRight,
   Code2,
+  Radio,
 } from 'lucide-react';
 import { SHEIKH_PROJECTS } from '../data/mockData';
 import { SheikhProject } from '../types';
@@ -38,6 +39,8 @@ export const ProjectHub: React.FC<ProjectHubProps> = ({ onSelectProjectTab }) =>
         return Cpu;
       case 'Terminal':
         return Terminal;
+      case 'Radio':
+        return Radio;
       default:
         return LayoutGrid;
     }
@@ -48,17 +51,27 @@ export const ProjectHub: React.FC<ProjectHubProps> = ({ onSelectProjectTab }) =>
       {/* Title & Filter Header */}
       <div className="mb-6 flex flex-col justify-between gap-4 border-b border-slate-800 pb-5 sm:flex-row sm:items-center">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30">
-              <FolderGit2 className="h-5 w-5" />
-            </span>
-            <h2 className="text-xl font-bold text-white sm:text-2xl">
-              শেখ ফরিদ প্রজেক্ট হাব (Sheikh Farid Ecosystem)
-            </h2>
+          <div className="flex items-center gap-3.5">
+            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-purple-500/40 bg-slate-950 p-0.5 shadow-lg shadow-purple-950/40 overflow-hidden">
+              <img
+                src="/src/assets/images/sheikh_farid_logo_1792083190919.jpg"
+                alt="Sheikh Farid AI Studio Official Logo"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover rounded-lg"
+              />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white sm:text-2xl flex items-center gap-2">
+                শেখ ফরিদ প্রজেক্ট হাব
+                <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-300 border border-purple-500/30">
+                  SF Studio Hub
+                </span>
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-400">
+                প্রধান সফটওয়্যার স্থপতি মোহাম্মদ শেখ ফরিদ উদ্ভাবিত হাই-পারফরম্যান্স গভটেক, এআই মডেল ও মিনি মাইক্রোসফট পিডব্লিউএ স্যুট।
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-sm text-slate-400">
-            প্রধান সফটওয়্যার স্থপতি মোহাম্মদ শেখ ফরিদ উদ্ভাবিত হাই-পারফরম্যান্স গভটেক, এআই মডেল ও মিনি মাইক্রোসফট পিডব্লিউএ স্যুট।
-          </p>
         </div>
 
         {/* Filter Pills */}
@@ -166,9 +179,11 @@ export const ProjectHub: React.FC<ProjectHubProps> = ({ onSelectProjectTab }) =>
                         if (project.id === 'citizendesk-bd') onSelectProjectTab('citizendesk');
                         else if (project.id === 'noorai-edge') onSelectProjectTab('ai-lab');
                         else if (project.id === 'code-exchange') onSelectProjectTab('vpn-studio');
-                        else onSelectProjectTab('video-analyzer');
+                        else if (project.id === 'live-broadcast-studio') onSelectProjectTab('live-studio');
+                        else if (project.id === 'audio-engine-30s') onSelectProjectTab('30s-audio-engine');
+                        else onSelectProjectTab('zero-cost-video-creator');
                       }}
-                      className="flex items-center gap-1 text-xs font-semibold text-purple-400 hover:text-purple-300 group-hover:translate-x-1 transition-all"
+                      className="flex items-center gap-1 text-xs font-semibold text-purple-400 hover:text-purple-300 group-hover:translate-x-1 transition-all cursor-pointer"
                     >
                       <span>অ্যাপে দেখুন</span>
                       <ArrowRight className="h-3.5 w-3.5" />

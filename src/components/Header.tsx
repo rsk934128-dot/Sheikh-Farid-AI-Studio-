@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Terminal,
   Music,
+  Radio,
+  Share2,
 } from 'lucide-react';
 import { ActiveTab } from '../types';
 
@@ -19,12 +21,16 @@ interface HeaderProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   onOpenArchitect: () => void;
+  onOpenLogoModal?: () => void;
+  onOpenShareModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   onOpenArchitect,
+  onOpenLogoModal,
+  onOpenShareModal,
 }) => {
   const tabs = [
     {
@@ -34,6 +40,14 @@ export const Header: React.FC<HeaderProps> = ({
       icon: Film,
       badge: '$০ খরচ',
       badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    },
+    {
+      id: 'live-studio' as ActiveTab,
+      label: 'লাইভ ব্রডকাস্ট স্টুডিও',
+      labelEn: 'Live WebRTC Studio',
+      icon: Radio,
+      badge: 'WebRTC ৬০fps',
+      badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
     },
     {
       id: '30s-audio-engine' as ActiveTab,
@@ -114,6 +128,15 @@ export const Header: React.FC<HeaderProps> = ({
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
               Gemini 3.1 Pro Preview Active
             </span>
+            {onOpenLogoModal && (
+              <button
+                onClick={onOpenLogoModal}
+                className="flex items-center gap-1.5 rounded-md bg-emerald-950/60 hover:bg-emerald-900/80 px-2.5 py-0.5 text-xs font-semibold text-emerald-300 transition-colors border border-emerald-500/40"
+              >
+                <Sparkles className="h-3 w-3 text-emerald-400" />
+                <span>লোগো কিট</span>
+              </button>
+            )}
             <button
               onClick={onOpenArchitect}
               className="flex items-center gap-1.5 rounded-md bg-slate-800 hover:bg-slate-700 px-2.5 py-0.5 text-xs font-medium text-slate-200 transition-colors border border-slate-700"
@@ -130,19 +153,25 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex h-16 items-center justify-between gap-4">
           {/* Logo & Brand */}
           <div
-            onClick={() => setActiveTab('video-analyzer')}
-            className="flex cursor-pointer items-center gap-3 select-none"
+            onClick={() => (onOpenLogoModal ? onOpenLogoModal() : setActiveTab('video-analyzer'))}
+            className="group flex cursor-pointer items-center gap-3 select-none"
+            title="শেখ ফরিদ স্টুডিও অফিসিয়াল লোগো ও ব্র্যান্ড কিট দেখুন"
           >
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-500 p-0.5 shadow-lg shadow-emerald-950/50">
-              <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-slate-950 font-bold text-white text-base">
-                <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent font-extrabold">
-                  SF
-                </span>
-              </div>
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-500/40 bg-slate-950 p-0.5 shadow-lg shadow-emerald-950/60 transition-all duration-300 group-hover:scale-105 group-hover:border-emerald-400 group-hover:shadow-emerald-500/20">
+              <img
+                src="/src/assets/images/sheikh_farid_logo_1792083190919.jpg"
+                alt="Sheikh Farid AI Studio Logo"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover rounded-[10px]"
+              />
+              <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-950">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping opacity-75" />
+                <span className="absolute h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold tracking-tight text-white sm:text-lg">
+                <h1 className="text-base font-bold tracking-tight text-white sm:text-lg group-hover:text-emerald-300 transition-colors">
                   Sheikh Farid AI Studio
                 </h1>
                 <span className="hidden lg:inline-block rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
@@ -188,6 +217,26 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Action */}
           <div className="flex items-center gap-2">
+            {onOpenLogoModal && (
+              <button
+                onClick={onOpenLogoModal}
+                title="অফিসিয়াল লোগো দেখুন ও ডাউনলোড করুন"
+                className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-950/40 hover:bg-emerald-900/60 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition-colors"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">লোগো কিট</span>
+              </button>
+            )}
+            {onOpenShareModal && (
+              <button
+                onClick={onOpenShareModal}
+                title="বিভিন্ন সোশ্যাল মিডিয়ায় অ্যাপ লিংক ও লোগো কার্ড শেয়ার করুন"
+                className="flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-950/40 hover:bg-cyan-900/60 px-3 py-1.5 text-xs font-semibold text-cyan-300 transition-colors"
+              >
+                <Share2 className="h-3.5 w-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">শেয়ার</span>
+              </button>
+            )}
             <button
               onClick={() => window.print()}
               title="বর্তমান পৃষ্ঠা প্রিন্ট করুন"

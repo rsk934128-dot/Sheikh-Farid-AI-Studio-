@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ZeroCostVideoStudio } from './components/ZeroCostVideoStudio';
 import { ThirtySecondAudioStudio } from './components/ThirtySecondAudioStudio';
+import { LiveBroadcastStudio } from './components/LiveBroadcastStudio';
 import { VideoAnalyzer } from './components/VideoAnalyzer';
 import { AILab } from './components/AILab';
 import { CitizenDesk } from './components/CitizenDesk';
@@ -9,8 +10,10 @@ import { GmailWorkspace } from './components/GmailWorkspace';
 import { ProjectHub } from './components/ProjectHub';
 import { VpnStudio } from './components/VpnStudio';
 import { ArchitectModal } from './components/ArchitectModal';
+import { LogoModal } from './components/LogoModal';
+import { ShareModal } from './components/ShareModal';
 import { ActiveTab } from './types';
-import { Wifi, WifiOff, Sparkles, Download } from 'lucide-react';
+import { Wifi, WifiOff, Sparkles, Download, Share2 } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('zero-cost-video-creator');
@@ -21,6 +24,8 @@ export default function App() {
     presetKey: string;
   } | null>(null);
   const [isArchitectOpen, setIsArchitectOpen] = useState<boolean>(false);
+  const [isLogoModalOpen, setIsLogoModalOpen] = useState<boolean>(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
@@ -96,6 +101,8 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenArchitect={() => setIsArchitectOpen(true)}
+        onOpenLogoModal={() => setIsLogoModalOpen(true)}
+        onOpenShareModal={() => setIsShareModalOpen(true)}
       />
 
       {/* Active Tab View */}
@@ -104,6 +111,11 @@ export default function App() {
           <ZeroCostVideoStudio
             initialAudioTrack={appliedAudioTrack}
             onOpenAudioStudio={() => setActiveTab('30s-audio-engine')}
+          />
+        )}
+        {activeTab === 'live-studio' && (
+          <LiveBroadcastStudio
+            onOpenAudioEngine={() => setActiveTab('30s-audio-engine')}
           />
         )}
         {activeTab === '30s-audio-engine' && (
@@ -134,15 +146,27 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             <button
+              onClick={() => setIsShareModalOpen(true)}
+              className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
+            >
+              🔗 শেয়ার ও লিংক কার্ড
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => setIsLogoModalOpen(true)}
+              className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+            >
+              🎨 অফিসিয়াল স্টুডিও লোগো
+            </button>
+            <span>•</span>
+            <button
               onClick={() => setIsArchitectOpen(true)}
               className="hover:text-emerald-400 transition-colors"
             >
-              সফটওয়্যার স্থপতি পরিচিতি
+              সফটওয়্যার স্থপতি
             </button>
             <span>•</span>
             <span>MIT License</span>
-            <span>•</span>
-            <span className="font-mono text-emerald-500/80">Gemini 3.1 Pro Video Pipeline</span>
           </div>
         </div>
       </footer>
@@ -151,6 +175,18 @@ export default function App() {
       <ArchitectModal
         isOpen={isArchitectOpen}
         onClose={() => setIsArchitectOpen(false)}
+      />
+
+      {/* Studio Official Logo Modal */}
+      <LogoModal
+        isOpen={isLogoModalOpen}
+        onClose={() => setIsLogoModalOpen(false)}
+      />
+
+      {/* Studio Social Share Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
       />
     </div>
   );
